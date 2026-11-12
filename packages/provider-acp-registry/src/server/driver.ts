@@ -30,6 +30,7 @@ import { AcpRegistryAdapterV2Driver, type AcpRegistryAdapterV2DriverEnv } from "
 import type { ProviderTextGeneration } from "@t3tools/provider-core/server/textGeneration";
 import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
+import type { ManagedServerProvider } from "@t3tools/provider-core/server/snapshot";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 import {
   defaultProviderContinuationIdentity,
@@ -334,6 +335,7 @@ function baseSnapshot(
         }),
     slashCommands: input.probe?.slashCommands ?? [],
     skills: input.probe?.skills ?? [],
+    ...(input.probe?.usageLimits ? { usageLimits: input.probe.usageLimits } : {}),
   };
 }
 
@@ -807,6 +809,19 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       }
       return { provider: enriched, generation: cacheState.generation };
     });
+    // Probe results are the only usage source here: publish through the managed
+    // snapshot's applyUsageLimits, since publishEnrichedSnapshot preserves the
+    // previously published windows and would drop a fresh reading. The holder
+    // bridges the construction race; a missed first reading arrives on the next probe.
+    let managed: ManagedServerProvider | null = null;
+    const publishProbeUsageLimits = (provider: ServerProvider): Effect.Effect<void> =>
+      provider.usageLimits !== undefined && provider.usageLimits.windows.length > 0
+        ? (managed?.applyUsageLimits({
+            windows: provider.usageLimits.windows,
+            checkedAt: provider.usageLimits.checkedAt,
+            complete: true,
+          }) ?? Effect.void)
+        : Effect.void;
     const snapshotSettings = yield* makeProviderSnapshotSettingsSource(effectiveConfig);
     const snapshot = yield* makeManagedServerProvider<
       ProviderSnapshotSettings<AcpRegistrySettings>
@@ -818,6 +833,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       // Inspection may fetch the registry when its disk cache is missing; creation must not wait on that.
       initialSnapshot: () => buildInitialAcpRegistrySnapshot(readinessInput),
       checkProvider,
+      invalidateUsageCache: invalidateEnrichmentCache,
       enrichSnapshot: Effect.fn("enrichSnapshot")(function ({
         snapshot,
         getSnapshot,
@@ -842,7 +858,10 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
                   Ref.get(enrichmentCache).pipe(
                     Effect.flatMap((current) =>
                       current.generation === generation
-                        ? withLiveRuntimeState(provider).pipe(Effect.flatMap(publishSnapshot))
+                        ? publishProbeUsageLimits(provider).pipe(
+                            Effect.andThen(withLiveRuntimeState(provider)),
+                            Effect.flatMap(publishSnapshot),
+                          )
                         : Effect.void,
                     ),
                   ),
@@ -923,6 +942,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
           }),
       ),
     );
+    managed = snapshot;
 
     const provideAcpManagementServices = <A, E>(
       effect: Effect.Effect<
