@@ -25,16 +25,20 @@ const e2eCwd = process.env.ZCODE_E2E_CWD ?? process.cwd();
 const e2eEnvironment = { ...process.env };
 const enabled = process.env.ZCODE_E2E === "1" && adapterDist !== undefined;
 
+// NodeServices must feed TestProviderHost rather than sit beside it in the
+// same mergeAll: siblings build in parallel, so their requirements would go
+// unsatisfied (TS377035).
+const nodeLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, FetchHttpClient.layer);
+
 const liveCatalog = AcpRegistrySupport.layerFromHost.pipe(
   Layer.provide(
     Layer.mergeAll(
-      TestProviderHost.layer(),
-      NodeServices.layer,
+      TestProviderHost.layer().pipe(Layer.provide(nodeLayer)),
       NodeCrypto.layer,
       FetchHttpClient.layer,
     ),
   ),
-  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, FetchHttpClient.layer)),
+  Layer.provideMerge(nodeLayer),
 );
 
 describe.skipIf(!enabled)("usageStats probe pull (live zcode-acp)", () => {
@@ -59,7 +63,8 @@ describe.skipIf(!enabled)("usageStats probe pull (live zcode-acp)", () => {
       expect(limits?.windows.length).toBeGreaterThan(0);
       const grant = limits?.windows.find((window) => window.id.startsWith("zcode:"));
       expect(grant).toBeDefined();
-      expect(grant?.label).toContain("ZCODE GLOBAL BUILD");
+      // The promo name rotates (GLOBAL BUILD / WEEKEND BUILD / ...): assert the shape.
+      expect(grant?.label).toMatch(/^ZCODE \S+ BUILD · GLM-5\.3-Flash$/u);
       expect(grant?.usedPercent).toBeGreaterThan(0);
       expect(grant?.usedPercent).toBeLessThanOrEqual(100);
       expect(grant?.resetsAt).toBeDefined();
