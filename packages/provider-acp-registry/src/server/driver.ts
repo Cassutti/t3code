@@ -880,7 +880,14 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       auth,
       snapshot: {
         ...snapshot,
-        refresh: snapshot.refresh.pipe(Effect.tap(() => controller.refreshMethods ?? Effect.void)),
+        refresh: invalidateEnrichmentCache.pipe(
+          // The panel's refresh must show fresh usage too: clear the probe cache
+          // so the enrichment following this forced refresh re-pulls
+          // account/usage_stats instead of serving the TTL-cached reading.
+          Effect.andThen(
+            snapshot.refresh.pipe(Effect.tap(() => controller.refreshMethods ?? Effect.void)),
+          ),
+        ),
       },
       invalidateCaches: (Option.isSome(runtimeCoordinator)
         ? runtimeCoordinator.value.clearLiveConfiguration(instanceId)
