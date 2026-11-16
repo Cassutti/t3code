@@ -13,6 +13,7 @@ import { extractDroidElicitationForm } from "./droidAcp.ts";
 import { makeKimiPromptOutcomeWatch } from "./kimiAcp.ts";
 import { extractOmpElicitationForm } from "./ompAcp.ts";
 import { extractOpenCodeElicitationForm } from "./opencodeAcp.ts";
+import { extractZcodeSubagentUpdate } from "./zcodeAcp.ts";
 import {
   copilotClientCapabilitiesMeta,
   extractCopilotSubagentUpdate,
@@ -225,6 +226,13 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
       /^claude-agent-acp(\.exe|\.cmd)?$/i.test(
         options.settings.commandPath.split(/[\\/]/).pop() ?? "",
       ));
+  // The zcode adapter is launched as `node …/zcode-acp/dist/cli.js server`, so
+  // the package path in commandArgs is the signal — registryAgentId is empty
+  // for local instances (source: "local"), and the registry id is "zcode-acp"
+  // when the agent comes from the catalog.
+  const isZcode =
+    registryAgentId === "zcode-acp" ||
+    options.settings.commandArgs.some((arg) => /zcode-acp/i.test(arg));
   const runtimeOptions = isClaude
     ? {
         ...options,
@@ -326,6 +334,9 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
           alwaysSetModel: true,
         }),
     mcpOverHttp: useHttpMcpServers,
+    // zcode's Agent/Task tool calls carry meta.subagent (zcode-acp dispatch.ts):
+    // project them onto the subagent timeline instead of plain tool cards.
+    ...(isZcode ? { extractSubagentUpdate: extractZcodeSubagentUpdate } : {}),
     makeRuntime: options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog),
     ...(runtimeCoordinator === undefined
       ? {}
