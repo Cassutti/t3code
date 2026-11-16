@@ -7,50 +7,63 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/**
- * zcode-acp marks its Agent/Task tool calls with `meta.subagent`: `true`
- * while running, a metadata object (agentId, usage counters) on the result
- * (dispatch.ts parseSubagentMetadata).
- */
+/** Detect the zcode adapter from its registry id or launch command: local
+ * installs run `node …/zcode-acp/dist/cli.js`, where registryAgentId is empty. */
+export function isZcodeAcpAgentSettings(settings: {
+  agentId: string;
+  commandArgs: readonly string[];
+}): boolean {
+  return (
+    settings.agentId === "zcode-acp" ||
+    settings.commandArgs.some((arg) => /zcode-acp[^/\\]*[/\\]dist[/\\]cli\.js$/i.test(arg))
+  );
+}
+
+/** zcode-acp marks its Agent/Task tool calls with meta.subagent: `true` while
+ * the subagent runs, a metadata object (agentId, usage counters) on the result. */
 function subagentMeta(tool: AcpToolCallState): true | Record<string, unknown> | undefined {
   const meta = record(tool.data.meta) ?? record(tool.data._meta);
   const sub = meta?.subagent;
-  if (sub === true || typeof sub === "string") return sub === true ? true : undefined;
-  return record(sub);
+  return sub === true || record(sub);
 }
 
-/**
- * Project a zcode Agent/Task tool call into the subagent timeline. The start
- * state (meta.subagent === true) projects as "running"; the result state
- * (meta.subagent = metadata object) projects as completed/failed and carries
- * the adapter-parsed agentId as the child session id.
- */
+/** The result text lives in the tool call's content blocks (zcode-acp leaves
+ * the raw hand-back text there); rawOutput is the fallback. */
+function resultText(tool: AcpToolCallState): string | null {
+  const rawOutput = tool.data.rawOutput;
+  if (typeof rawOutput === "string" && rawOutput.trim().length > 0) return rawOutput;
+  const content = Array.isArray(tool.data.content) ? tool.data.content : [];
+  const parts = content
+    .map((block) => record(block)?.content ?? block)
+    .map((block) => record(block)?.text)
+    .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
 export function extractZcodeSubagentUpdate(
   tool: AcpToolCallState,
 ): AcpAdapterV2SubagentUpdate | undefined {
   const sub = subagentMeta(tool);
   if (sub === undefined) return undefined;
-  const title = typeof tool.title === "string" ? tool.title : null;
-  if (sub !== true) {
-    const rawInput = record(tool.data.rawInput);
-    return {
-      nativeTaskId: tool.toolCallId,
-      prompt: typeof rawInput?.prompt === "string" ? rawInput.prompt : "",
-      title,
-      model: null,
-      status: tool.status === "failed" ? "failed" : "completed",
-      childSessionId: typeof sub.agentId === "string" ? sub.agentId : null,
-      result: typeof tool.data.rawResult === "string" ? tool.data.rawResult : null,
-    };
-  }
   const rawInput = record(tool.data.rawInput);
-  return {
+  const base = {
     nativeTaskId: tool.toolCallId,
     prompt: typeof rawInput?.prompt === "string" ? rawInput.prompt : "",
-    title,
+    title: typeof tool.title === "string" ? tool.title : null,
     model: null,
-    status: tool.status === "failed" ? "failed" : "running",
-    childSessionId: null,
-    result: null,
+  };
+  if (sub === true) {
+    return {
+      ...base,
+      status: tool.status === "failed" ? "failed" : "running",
+      childSessionId: null,
+      result: null,
+    };
+  }
+  return {
+    ...base,
+    status: tool.status === "failed" ? "failed" : "completed",
+    childSessionId: typeof sub.agentId === "string" ? sub.agentId : null,
+    result: resultText(tool),
   };
 }

@@ -13,7 +13,7 @@ import { extractDroidElicitationForm } from "./droidAcp.ts";
 import { makeKimiPromptOutcomeWatch } from "./kimiAcp.ts";
 import { extractOmpElicitationForm } from "./ompAcp.ts";
 import { extractOpenCodeElicitationForm } from "./opencodeAcp.ts";
-import { extractZcodeSubagentUpdate } from "./zcodeAcp.ts";
+import { extractZcodeSubagentUpdate, isZcodeAcpAgentSettings } from "./zcodeAcp.ts";
 import {
   copilotClientCapabilitiesMeta,
   extractCopilotSubagentUpdate,
@@ -230,9 +230,7 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
   // the package path in commandArgs is the signal — registryAgentId is empty
   // for local instances (source: "local"), and the registry id is "zcode-acp"
   // when the agent comes from the catalog.
-  const isZcode =
-    registryAgentId === "zcode-acp" ||
-    options.settings.commandArgs.some((arg) => /zcode-acp/i.test(arg));
+  const isZcode = isZcodeAcpAgentSettings(options.settings);
   const runtimeOptions = isClaude
     ? {
         ...options,
