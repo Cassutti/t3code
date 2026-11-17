@@ -286,7 +286,11 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
         }),
     // zcode's Agent/Task tool calls carry meta.subagent (zcode-acp dispatch.ts):
     // project them onto the subagent timeline instead of plain tool cards.
-    ...(isZcode ? { extractSubagentUpdate: extractZcodeSubagentUpdate } : {}),
+    // Backend subagents that die mid-turn never close their tool_call update,
+    // so settle them at turn completion like the antigravity flavor does.
+    ...(isZcode
+      ? { extractSubagentUpdate: extractZcodeSubagentUpdate, subagentsIdleOnTurnCompletion: true }
+      : {}),
     makeRuntime: options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog),
     ...(runtimeCoordinator === undefined
       ? {}
