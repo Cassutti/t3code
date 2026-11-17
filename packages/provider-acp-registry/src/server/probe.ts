@@ -572,7 +572,10 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
           }),
         ),
         Effect.tapError((error) =>
-          Effect.logWarning("probe: the account/usage_stats pull failed", {
+          // Debug, not warning: every probe of an agent without the method
+          // (claude, copilot, kimi) lands here, so warning level would turn
+          // the expected "method not found" into recurring background noise.
+          Effect.logDebug("probe: the account/usage_stats pull failed", {
             error: String(error),
           }),
         ),
