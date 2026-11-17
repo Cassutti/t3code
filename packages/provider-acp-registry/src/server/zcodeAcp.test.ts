@@ -74,6 +74,21 @@ describe("extractZcodeSubagentUpdate", () => {
     expect(extractZcodeSubagentUpdate(tool)?.result).toBe("fatto");
   });
 
+  it("prefers content blocks over a bound rawOutput", () => {
+    const tool = toolCall({
+      toolCallId: "tc_2b",
+      status: "completed",
+      data: {
+        meta: { subagent: { agentId: "agent_x" } },
+        content: [
+          { type: "content", content: { type: "text", text: "report completo dal subagent" } },
+        ],
+        rawOutput: "report troncato…",
+      },
+    });
+    expect(extractZcodeSubagentUpdate(tool)?.result).toBe("report completo dal subagent");
+  });
+
   it("failed tool call projects as failed", () => {
     const tool = toolCall({
       toolCallId: "tc_3",

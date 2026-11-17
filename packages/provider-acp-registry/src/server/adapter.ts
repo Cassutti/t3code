@@ -226,10 +226,7 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
       /^claude-agent-acp(\.exe|\.cmd)?$/i.test(
         options.settings.commandPath.split(/[\\/]/).pop() ?? "",
       ));
-  // The zcode adapter is launched as `node …/zcode-acp/dist/cli.js server`, so
-  // the package path in commandArgs is the signal — registryAgentId is empty
-  // for local instances (source: "local"), and the registry id is "zcode-acp"
-  // when the agent comes from the catalog.
+  // See isZcodeAcpAgentSettings for how a zcode adapter is recognized.
   const isZcode = isZcodeAcpAgentSettings(options.settings);
   const runtimeOptions = isClaude
     ? {

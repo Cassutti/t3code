@@ -63,8 +63,9 @@ describe.skipIf(!enabled)("usageStats probe pull (live zcode-acp)", () => {
       expect(limits?.windows.length).toBeGreaterThan(0);
       const grant = limits?.windows.find((window) => window.id.startsWith("zcode:"));
       expect(grant).toBeDefined();
-      // The promo name rotates (GLOBAL BUILD / WEEKEND BUILD / ...): assert the shape.
-      expect(grant?.label).toMatch(/^ZCODE \S+ BUILD · GLM-5\.3-Flash$/u);
+      // The promo name and metered model rotate (GLOBAL BUILD / WEEKEND BUILD /
+      // ...): assert the label shape without hardcoding either.
+      expect(grant?.label).toMatch(/^ZCODE .+ · \S+$/u);
       expect(grant?.usedPercent).toBeGreaterThan(0);
       expect(grant?.usedPercent).toBeLessThanOrEqual(100);
       expect(grant?.resetsAt).toBeDefined();

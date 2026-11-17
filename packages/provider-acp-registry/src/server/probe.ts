@@ -560,15 +560,18 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
       // Account-level quota pull (zcode-acp exposes `account/usage_stats` right
       // after initialize). Agents without the method fail here in one round trip;
       // either way the answer never blocks or fails the probe itself.
-      const usageCheckedAt = DateTime.formatIso(yield* DateTime.now);
       const usageLimits = yield* runtime.request("account/usage_stats", {}).pipe(
         Effect.timeoutOption(USAGE_STATS_TIMEOUT),
         Effect.flatMap(
           Option.match({
             onNone: () => Effect.undefined,
-            onSome: (payload) => Effect.succeed(usageStatsToUsageLimits(payload, usageCheckedAt)),
+            onSome: Effect.fn("onSome")(function* (payload) {
+              const usageCheckedAt = DateTime.formatIso(yield* DateTime.now);
+              return usageStatsToUsageLimits(payload, usageCheckedAt);
+            }),
           }),
         ),
+        Effect.tapError(() => Effect.logWarning("probe: the account/usage_stats pull failed")),
         Effect.catch(() => Effect.undefined),
       );
 

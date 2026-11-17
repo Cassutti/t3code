@@ -28,16 +28,17 @@ function subagentMeta(tool: AcpToolCallState): true | Record<string, unknown> | 
 }
 
 /** The result text lives in the tool call's content blocks (zcode-acp leaves
- * the raw hand-back text there); rawOutput is the fallback. */
+ * the raw hand-back text there); rawOutput is the fallback — content wins
+ * because rawOutput may be bound-truncated. */
 function resultText(tool: AcpToolCallState): string | null {
-  const rawOutput = tool.data.rawOutput;
-  if (typeof rawOutput === "string" && rawOutput.trim().length > 0) return rawOutput;
   const content = Array.isArray(tool.data.content) ? tool.data.content : [];
   const parts = content
     .map((block) => record(block)?.content ?? block)
     .map((block) => record(block)?.text)
     .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
-  return parts.length > 0 ? parts.join("\n") : null;
+  if (parts.length > 0) return parts.join("\n");
+  const rawOutput = tool.data.rawOutput;
+  return typeof rawOutput === "string" && rawOutput.trim().length > 0 ? rawOutput : null;
 }
 
 export function extractZcodeSubagentUpdate(

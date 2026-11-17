@@ -62,6 +62,7 @@ function zcodeWindows(section: ZcodeStatsSection): ReadonlyArray<ServerProviderU
     const usedPercent = asFiniteNumber(entry.usagePercent);
     if (key === null || usedPercent === null) return [];
     const modelIds = asStringArray(entry.modelIds);
+    const resetsAt = isoFromEpochMs(entry.resetsAt);
     return [
       {
         id: `zcode:${key}`,
@@ -69,9 +70,7 @@ function zcodeWindows(section: ZcodeStatsSection): ReadonlyArray<ServerProviderU
         label: label ?? key,
         ...(modelIds !== undefined && modelIds.length > 0 ? { modelIds } : {}),
         usedPercent: clampPercent(usedPercent),
-        ...(isoFromEpochMs(entry.resetsAt) !== undefined
-          ? { resetsAt: isoFromEpochMs(entry.resetsAt) }
-          : {}),
+        ...(resetsAt !== undefined ? { resetsAt } : {}),
       } satisfies ServerProviderUsageWindow,
     ];
   });
@@ -87,6 +86,7 @@ function glmWindows(section: GlmStatsSection): ReadonlyArray<ServerProviderUsage
     if (key === null || usedPercent === null) return [];
     const resolvedLabel = label ?? key;
     const modelIds = asStringArray(entry.modelIds);
+    const resetsAt = isoFromEpochMs(entry.nextResetTime);
     return [
       {
         id: `glm:${key}`,
@@ -94,9 +94,7 @@ function glmWindows(section: GlmStatsSection): ReadonlyArray<ServerProviderUsage
         label: resolvedLabel,
         ...(modelIds !== undefined && modelIds.length > 0 ? { modelIds } : {}),
         usedPercent: clampPercent(usedPercent),
-        ...(isoFromEpochMs(entry.nextResetTime) !== undefined
-          ? { resetsAt: isoFromEpochMs(entry.nextResetTime) }
-          : {}),
+        ...(resetsAt !== undefined ? { resetsAt } : {}),
       } satisfies ServerProviderUsageWindow,
     ];
   });
