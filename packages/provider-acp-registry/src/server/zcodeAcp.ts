@@ -30,9 +30,9 @@ function subagentMeta(tool: AcpToolCallState): true | Record<string, unknown> | 
 }
 
 /** The result text lives in the tool call's content blocks (zcode-acp leaves
- * the raw hand-back text there); rawOutput is the fallback — content wins
- * because rawOutput may be bound-truncated. All protocol-allowed block shapes
- * are handled: {content:{text}}, {content:[{text},…]} and raw {text} blocks. */
+ * the raw hand-back text there); rawOutput is the fallback for tool calls
+ * that close without content. All protocol-allowed block shapes are handled:
+ * {content:{text}}, {content:[{text},…]} and raw {text} blocks. */
 function resultText(tool: AcpToolCallState): string | null {
   const content = Array.isArray(tool.data.content) ? tool.data.content : [];
   const parts = content
