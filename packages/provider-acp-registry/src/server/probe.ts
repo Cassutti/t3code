@@ -571,7 +571,11 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
             }),
           }),
         ),
-        Effect.tapError(() => Effect.logWarning("probe: the account/usage_stats pull failed")),
+        Effect.tapError((error) =>
+          Effect.logWarning("probe: the account/usage_stats pull failed", {
+            error: String(error),
+          }),
+        ),
         Effect.catch(() => Effect.undefined),
       );
 

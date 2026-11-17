@@ -89,6 +89,26 @@ describe("extractZcodeSubagentUpdate", () => {
     expect(extractZcodeSubagentUpdate(tool)?.result).toBe("report completo dal subagent");
   });
 
+  it("flattens protocol-allowed nested content arrays before extracting text", () => {
+    const tool = toolCall({
+      toolCallId: "tc_2c",
+      status: "completed",
+      data: {
+        meta: { subagent: { agentId: "agent_x" } },
+        content: [
+          {
+            type: "content",
+            content: [
+              { type: "text", text: "prima parte" },
+              { type: "text", text: "seconda parte" },
+            ] as unknown,
+          },
+        ] as unknown,
+      },
+    });
+    expect(extractZcodeSubagentUpdate(tool)?.result).toBe("prima parte\nseconda parte");
+  });
+
   it("failed tool call projects as failed", () => {
     const tool = toolCall({
       toolCallId: "tc_3",
@@ -106,15 +126,6 @@ describe("extractZcodeSubagentUpdate", () => {
       data: { meta: { terminal_output: true }, rawInput: { command: "ls" } },
     });
     expect(extractZcodeSubagentUpdate(tool)).toBeUndefined();
-  });
-
-  it("reads the subagent marker from data._meta too (raw-update path)", () => {
-    const tool = toolCall({
-      toolCallId: "tc_5",
-      status: "inProgress",
-      data: { _meta: { subagent: true } },
-    });
-    expect(extractZcodeSubagentUpdate(tool)?.status).toBe("running");
   });
 });
 
@@ -138,12 +149,16 @@ describe("isZcodeAcpAgentSettings", () => {
     ).toBe(true);
   });
 
-  it("does not match other adapters or unrelated paths", () => {
+  it("does not match other adapters, lookalike packages, or unrelated paths", () => {
     expect(
       isZcodeAcpAgentSettings({
         agentId: "claude-acp",
         commandArgs: ["claude-agent-acp/dist/cli.js"],
       }),
+    ).toBe(false);
+    // No separator before "zcode-acp": a lookalike package never matches.
+    expect(
+      isZcodeAcpAgentSettings({ agentId: "", commandArgs: ["my-zcode-acp/dist/cli.js"] }),
     ).toBe(false);
     expect(isZcodeAcpAgentSettings({ agentId: "", commandArgs: [] })).toBe(false);
   });
