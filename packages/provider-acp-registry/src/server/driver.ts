@@ -854,15 +854,20 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             Option.match({
               onNone: () => Effect.void,
               onSome: ({ provider, generation }) =>
-                liveSnapshotSemaphore.withPermit(
-                  Ref.get(enrichmentCache).pipe(
-                    Effect.flatMap((current) =>
-                      current.generation === generation
-                        ? publishProbeUsageLimits(provider).pipe(
-                            Effect.andThen(withLiveRuntimeState(provider)),
-                            Effect.flatMap(publishSnapshot),
-                          )
-                        : Effect.void,
+                // Usage publishes before the epoch check: an active session bumps
+                // the cache generation mid-probe, and skipping would discard the
+                // only usage reading this provider produces. applyUsageLimits
+                // reconciles freshness, so the early publish cannot regress state.
+                publishProbeUsageLimits(provider).pipe(
+                  Effect.andThen(
+                    liveSnapshotSemaphore.withPermit(
+                      Ref.get(enrichmentCache).pipe(
+                        Effect.flatMap((current) =>
+                          current.generation === generation
+                            ? withLiveRuntimeState(provider).pipe(Effect.flatMap(publishSnapshot))
+                            : Effect.void,
+                        ),
+                      ),
                     ),
                   ),
                 ),
